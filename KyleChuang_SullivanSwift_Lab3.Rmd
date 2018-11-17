@@ -25,6 +25,7 @@ library(xtable)
 ```
 ```{r include=FALSE}
 # setwd('~/Documents/Classes/W271 - Advanced Statistical Methods/f18-kchuangk/')
+
 ts_plots = function(x) {
    par(mfrow=c(2,2),par=c(2,2,2,2))
    plot(x,main='t-Plot')
@@ -32,6 +33,7 @@ ts_plots = function(x) {
    acf(x)
    pacf(x)
 }
+
 ts_resid = function(x){
   par(mar=c(2,2,2,2))
   ggtsdisplay(x) 
@@ -41,6 +43,7 @@ ts_resid = function(x){
   row.names(d)=c('p-Value')
   xtable(d)
 }
+
 forecast_exp_func=function(x){
   x$mean=exp(x$mean)
   x$upper=exp(x$upper)
@@ -48,6 +51,7 @@ forecast_exp_func=function(x){
   x$x=exp(x$x)
   return(x)
 }
+
 arimatable = function(m,dfts){
   acc=accuracy(fitted(m),dfts)
   tbl=data.frame(Beta=m$coef,SE=diag(sqrt(m$var.coef)),Sigma2=m$sigma2,AIC=m$aic,BIC=BIC(m),LogLikelihood=m$loglik,ME=acc[1,1],RMSE=acc[1,2],MAE=acc[1,3])
@@ -55,6 +59,7 @@ arimatable = function(m,dfts){
   return(tbl)
 }
 ```
+
 # Question 1: Forecasting using a SARIMA model
 
 Note: Custom function ts_plots() [plot time series], ts_resid() [plot residuals], forecast_exp() [exponentiate all values in forecasts objects] and arimatable() [summarizes arima table] are not included in the R pdf but is in the R-markdown file.
@@ -74,19 +79,23 @@ dfts_log=log(dfts)
 ts_plots(dfts_log)
 ```
 
-From the logged time series plots, there is a trend and time series component. The seaonality is likely to be quarterly from the t-plot. The seasonal boxplot does not show significant differences in each of the quarters. However, this is possibly due to the trend component affecting the cycles. We will detrend the series first and re-exmine the quarterly plots.
+From the logged time series plots, there is a trend and seasonal component. The seasonality is likely to be quarterly from the t-plot. We will look at a box plot of the data by season.
 
 ```{r fig.height=2}
 ggplot(data.frame(cycle=factor(cycle(dfts_log)),data=as.numeric(dfts_log)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot()
 ```
 
-First, the time series will be detrended using a first differencing and examine the seasonality plot. The detrended series show a strong quarterly seasonality. The time series will be deseasonalized using a quarterly cycle.
+The seasonal boxplot does not show significant differences in each of the quarters. However, this is possibly due to the trend component affecting the cycles. We will detrend the series first and re-exmine the quarterly plots.
+
+First, the time series will be detrended using a first differencing and we examine the seasonality plot.
+
 ```{r fig.height=2}
 tmp=diff(dfts_log,lag=1)
 ggplot(data.frame(cycle=factor(cycle(tmp)),data=as.numeric(tmp)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot() + ggtitle('Quarterly Detrended Time Series Plot')
 ```
 
-The detrended & deseasonalized plot show the quarterley mean and variance is now similar across the quarters indicating a deseasonalized time series. Augmented dickey-fuller and Phillips-Perron test are performed on deseasonalized, detrended time series both rejecting the non-stationary hypothesis. With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will use the SARIMA model to model the original logged time series rather than modeling the detrended & deseasonalized logged  data to combine the steps.
+The detrended series shows a strong quarterly seasonality. The time series will be deseasonalized using a quarterly cycle.
+
 ```{r results='markup'}
 df_ds=diff(diff(dfts_log,lag=1),lag=4)
 ggplot(data.frame(cycle=factor(cycle(df_ds)),data=as.numeric(df_ds)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot() + ggtitle('Quarterly Detrended & Deseasonalized Time Series Plot')
@@ -94,20 +103,24 @@ adf.test(df_ds)
 pp.test(df_ds)
 ```
 
-The t-plot shows the time series to have been detrended and deseasonalized. On the pacf plot, there appears to strong serial correlation quarterly as it oscillates towards zero. The acf plot has high serial correlation at the 4th lag. The strong acf at lag 4 and cycling towards 0 in pact suggest there is a SMA(1) component. 
+The detrended and deseasonalized plot show the quarterly mean and variance is now similar across the quarters indicating a deseasonalized time series. Augmented Dickey-Fuller and Phillips-Perron test are performed on deseasonalized, detrended time series both rejecting the non-stationary hypothesis. With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will use the SARIMA model to model the original logged time series rather than modeling the detrended and deseasonalized logged data to combine the steps.
 
 ```{r}
 ggtsdisplay(df_ds)
 ```
 
-Our intial model will be $SARIMA(0,1,0)(0,1,1)_4$.
+--SS Do we use the deseasonalized, detrended data to decide where to start with our SARIMA? or the original data?
+
+The t-plot shows the time series to have been detrended and deseasonalized. On the pacf plot, there appears to strong serial correlation quarterly as it oscillates towards zero. The acf plot has high serial correlation at the 4th lag. The strong acf at lag 4 and cycling towards 0 in pact suggest there is a SMA(1) component. 
+
+Based on our exploration, the intial model will be $SARIMA(0,1,0)(0,1,1)_4$.
 
 ```{r}
 m = arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(0,1,1),period=4))
 xtable(arimatable(m,dfts_log))
 ```
 
-The SMA1 $\beta$ at -0.5167 with se. at 0.0975 suggesting signficance. The $\beta_{sma1}$ does not cross zero.
+The SMA1 $\beta$ at -0.5167 with se. at $0.0975$ suggesting signficance. The $\beta_{sma1}$ does not cross zero.
 
 The t-plot appears to be white noise with heteroskedasticity. We will not further attempt to fit the variance of the residuals with GARCH/ARCH models. The t-plot shows no trend or seasonality. The residuals appear to be a stationary white noise process (though not necessarily Gaussian white noise) from the augmented Dickey Fuller and Phillips-Perron Test. Finally, the Ljung-box test almost shows the residuals to be uncorrelated with a p-Value of 0.35 as confirmed by the visual inspection.
 
@@ -115,7 +128,7 @@ The t-plot appears to be white noise with heteroskedasticity. We will not furthe
 ts_resid(m$residuals)
 ```
 
-We will performed additiona models to examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to examine the fit of the model to choose our final model.
+We will  examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to aid in choosing our final model.
 
 ```{r}
 results=data.frame(matrix(ncol=9,nrow=0))
@@ -190,9 +203,9 @@ KYLE - OWN TEST
 Furthermore, the residuals appear to be heteroskedastic. From the $residuals^2$ act and pacf plots, There appears to be an AR component in the volatility suggesting a GARCH(1,0) model.
 
 ```{r}
-library(fGarch)
-m.garch=garchFit(~garch(1,0),m$residuals,trace=FALSE)
-summary(m.garch)
+#library(fGarch)
+#m.garch=garchFit(~garch(1,0),m$residuals,trace=FALSE)
+#summary(m.garch)
 ```
 
 ```{r}
@@ -205,9 +218,9 @@ ggplot(data.frame(cycle=factor(cycle(tmp)),data=as.numeric(tmp)),aes(x=cycle,y=d
 ```
 
 ```{r}
-ggplot(data.frame(r=residuals(m.garch)),aes(sample=r))+geom_qq()+geom_qq_line(col='red')
-hist(residuals(m.garch))
-predict(m.garch)
+#ggplot(data.frame(r=residuals(m.garch)),aes(sample=r))+geom_qq()+geom_qq_line(col='red')
+#hist(residuals(m.garch))
+#predict(m.garch)
 ```
 The series appear to be detrended and deseaonalized. From the ACF gaph
 
@@ -576,7 +589,7 @@ tail(amaz)
 2. Convert them to xts objects
 
 ```{r}
-amaz.xts=as.xts(amaz[,2:6],Index=as.Date(amaz$Index,"%Y-%m-%d"))
+#amaz.xts=as.xts(amaz[,2:6],Index=as.Date(amaz$Index,"%Y-%m-%d"))
 ```
 
 3. Merge the two set of series together, perserving all of the obserbvations in both set of series
