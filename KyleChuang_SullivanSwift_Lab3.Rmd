@@ -586,6 +586,7 @@ head(cbind(TWTR[,4], rollapply(TWTR[, 4], 10, FUN = mean, na.rm = TRUE)),15)
 1. Read AMAZ.csv and UMCSENT.csv into R as R DataFrames
 
 ```{r}
+library(xts)
 amaz <- read.csv('AMAZ.csv')
 umcsent <- read.csv('UMCSENT.csv')
 
@@ -608,7 +609,8 @@ amaz.xts <- as.xts(amaz[,2:6],order.by=as.Date(amaz$Index,format="%Y-%m-%d"))
 head(amaz.xts)
 tail(amaz.xts)
 
-umcsent.xts <- as.xts(umcsent[,2], order.by=as.Date(umcsent$Index, format="%Y-%m-%d"))
+umcsent.xts <- as.xts(umcsent[,2], order.by=as.Date(umcsent$Index, format="%Y-%d-%m"))
+colnames(umcsent.xts)=c('umcsent')
 
 head(umcsent.xts)
 tail(umcsent.xts)
@@ -623,7 +625,7 @@ merged <- merge(amaz.xts, umcsent.xts, join="outer")
 head(merged)
 tail(merged)
 
-length(merged)
+dim(merged)
 ```
     
     a. fill all of the missing values of the UMCSENT series with -9999
@@ -631,7 +633,10 @@ length(merged)
 --SS: I'm a little confused here. Does he mean the original UMCSENT or the one we merged with?
 
 ```{r}
-umcsent.na <- merge(amaz.xts, umcsent.xts, join="outer", fill = -9999)
+umcsent01=merged
+head(umcsent01)
+umcsent01=na.fill(umcsent01,-9999)
+head(umcsent01)
 ```
     
     b. then create a new series, named UMCSENT02, from the original UMCSENT series replace all of the -9999 with NAs
@@ -639,43 +644,54 @@ umcsent.na <- merge(amaz.xts, umcsent.xts, join="outer", fill = -9999)
 --SS: I don't think the original has any -9999s?
 
 ```{r}
-umcsent02 <- umcsent
+umcsent02 <- umcsent01
+head(umcsent02)
 umcsent02[umcsent02 <= -9999 ] <- NA
+head(umcsent02)
 ```
     
     c. then create a new series, named UMCSENT03, and replace the NAs with the last observation
 
 ```{r}
-umcsent03 <- na.locf(umcsent02[,1], na.rm = TRUE, fromLast = TRUE) 
+umcsent03=umcsent02
+head(umcsent03)
+umcsent03 <- na.locf(umcsent02, na.rm = TRUE, fromLast = TRUE) 
+head(umcsent03)
 ```
     
     d. then create a new series, named UMCSENT04, and replace the NAs using linear interpolation.
     
 ```{r}
-umcsent04 <- na.locf(umcsent02[,1], na.rm = TRUE, fromLast = FALSE)
+umcsent04=umcsent02
+head(umcsent04)
+head(umcsent04['2007-01',],15)
+umcsent04=na.approx(umcsent04,maxgap=10000)
+# Note amazon has N/As in 1/1/17 and 1/2/17 because there is no data before 1/1/03 so there isnothing to interpolate
+head(umcsent04['2007-01',],15)
 ```
     
     e. Print out some observations to ensure that your merge as well as the missing value imputation are done correctly. I leave it up to you to decide exactly how many observations to print; do something that makes sense. (Hint: Do not print out the entire dataset!)
     
 ```{r}
-
+# Not can we just show what we did above? - suggestions welcome?
 ```
 
 4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
 
 ```{r}
-f <- function(x) {
-  
-}
+amaz.xts.close=amaz.xts$AMAZ.Close
+head(amaz.xts.close)
+head(diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=FALSE))
+head(diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=FALSE)/amaz.xts.close)
+head(cbind(amaz.xts.close,diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=TRUE),diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=TRUE)/amaz.xts.close))
+# another way to do it in 1 long line...
+#head(diff(amaz.xts$AMAZ.Close,lag=1,differences=1,log=F,na.pad=F)/amaz.xts$AMAZ.Close)
 ```
 
 5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
 
 ```{r}
-head(cbind(merged$AMAZ.close[,4], rollapply(merged$AMAZ.close, 20, FUN = mean, na.rm = TRUE)),15)
+tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,20,FUN=mean,na.rm=TRUE)),15)
+tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,50,FUN=mean,na.rm=TRUE)),15)
 ```
-
-```{r}
-head(cbind(merged$AMAZ.close[,4], rollapply(merged$AMAZ.close, 20, FUN = mean, na.rm = TRUE)),15)
-
-```
+isfleijslfjeslifjes
