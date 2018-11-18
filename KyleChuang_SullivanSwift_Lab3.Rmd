@@ -1,7 +1,7 @@
 ---
 title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data (W271):
   Lab 3'
-author: "Professor Jeffrey Yau"
+author: "PKyle Chuang and Sullivan Swift"
 geometry: margin=1in
 output:
   pdf_document:
@@ -85,7 +85,7 @@ From the logged time series plots, there is a trend and seasonal component. The 
 ggplot(data.frame(cycle=factor(cycle(dfts_log)),data=as.numeric(dfts_log)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot()
 ```
 
-The seasonal boxplot does not show significant differences in each of the quarters. However, this is possibly due to the trend component affecting the cycles. We will detrend the series first and re-exmine the quarterly plots.
+The seasonal boxplot does not show significant differences in each of the quarters. However, this is possibly due to the trend component affecting the cycles. We will detrend the series first and re-examine the quarterly plots.
 
 First, the time series will be detrended using a first differencing and we examine the seasonality plot.
 
@@ -122,13 +122,13 @@ xtable(arimatable(m,dfts_log))
 
 The SMA1 $\beta$ at -0.5167 with se. at $0.0975$ suggesting signficance. The $\beta_{sma1}$ does not cross zero.
 
-The t-plot appears to be white noise with heteroskedasticity. We will not further attempt to fit the variance of the residuals with GARCH/ARCH models. The t-plot shows no trend or seasonality. The residuals appear to be a stationary white noise process (though not necessarily Gaussian white noise) from the augmented Dickey Fuller and Phillips-Perron Test. Finally, the Ljung-box test almost shows the residuals to be uncorrelated with a p-Value of 0.35 as confirmed by the visual inspection.
-
 ```{r}
 ts_resid(m$residuals)
 ```
 
-We will  examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to aid in choosing our final model.
+The t-plot of the residuals appears to be white noise with heteroskedasticity. We will not further attempt to fit the variance of the residuals with GARCH/ARCH models. The t-plot shows no trend or seasonality. The residuals appear to be a stationary white noise process (though not necessarily Gaussian white noise) from the augmented Dickey Fuller and Phillips-Perron Test. Finally, the Ljung-box test almost shows the residuals to be uncorrelated with a p-Value of 0.35 as confirmed by the visual inspection.
+
+We will examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to aid in choosing our final model.
 
 ```{r}
 results=data.frame(matrix(ncol=9,nrow=0))
@@ -142,7 +142,7 @@ xtable(head(results[order(results$AIC,results$BIC),],5))
 arimatable(auto.arima(dfts_log),dfts_log)
 ```
 
-Auto.arima() selected $SARIMA(0,1,0)(2,1,0)_4$. From the manual iterations and auto.arims(), $SARIMA(0,1,0)(0,1,2)_4$ and $SARIMA(0,1,0)(2,1,0)_4$ are chosen as the candidate models as they have the lowest AICs and BICs.
+Auto.arima() selected $SARIMA(0,1,0)(2,1,0)_4$. From the manual iterations and auto.arima(), $SARIMA(0,1,0)(0,1,2)_4$ and $SARIMA(0,1,0)(2,1,0)_4$ are chosen as the candidate models as they have the lowest AICs and BICs.
 
 In the $SARIMA(0,1,0)(0,1,2)_4$, $\beta$s appear to be statistically siginficant and the residuals do appear to be white noise with stationarity and no autocorrelation. The Ljung-Box p-Value is higher than the $SARIMA(0,1,0)(0,1,1)_4$ model. Note that the heteroskedasticity in residuals no longer appear.
 
@@ -153,6 +153,7 @@ ts_resid(m.010012$residuals)
 ```
 
 In the $SARIMA(0,1,0)(2,1,0)_4$, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is ???? and the heterskedasticity of the residuals is not evident.
+
 ```{r}
 m.010210=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(2,1,0),period=4))
 xtable(arimatable(m.010210,dfts_log))
@@ -172,11 +173,13 @@ autoplot(forecast_sma) +autolayer(exp(fitted(m.010012)),series='ARIMA(0,1,0)(0,1
 ```
 
 The in-sample fits for both models are extremely close to the historical fit. The predictions for both models are extremely similar. We will select the models based on accuracy of the time series. The time series is logged to avoid overweighting the larger values on the time series due to the trend.
+
 ```{r}
 pred_test=window(log(actual),start=c(2015,1))
 xtable(accuracy(forecast(m.010210),pred_test),caption='$ARIMA(0,1,0)(2,1,0)_4$')
 xtable(accuracy(forecast(m.010012),pred_test),caption='$ARIMA(0,1,0)(0,1,2)_4$')
 ```
+
 Every accuracy measure tested showed a lower error with $SARIMA(0,1,0)(2,1,0)_4$ model. The final model chosen is
 # CHECK BELOW
 \[
@@ -299,7 +302,7 @@ library(ggplot2)
     
     B. The following questions in "xts FAQ"
         a. How do I create an xts index with millisecond precision?
-        b. OK, so now I have my millisecond series but I still can’t see the milliseconds displayed. What went wrong?
+        b. OK, so now I have my millisecond series but I still can't see the milliseconds displayed. What went wrong?
 
   2. Follow the following section of this document
 
@@ -342,9 +345,11 @@ X <- xts(x, order.by=idx)
 str(X)
 head(X,10)
 ```
+
 As you can see from the structure of an `xts` objevct, it contains both a data component and an index, indexed by an objevct of class `Date`.
 
 **xtx constructor**
+
 ```
 xts(x=Null,
     order.by=index(x),
@@ -358,6 +363,7 @@ As mentioned previous, the two most important arguments are ```x``` and ```order
 With a xts object, one can decompose it.
 
 ### Deconstructing xts
+
 ```coredata()``` is used to extract the data component
 ```{r}
 head(coredata(X),5)
@@ -370,7 +376,7 @@ head(index(X),5)
   
 ### Conversion to xts from other time-series objects
 
-We will use the same dataset "bls_unemployment.csv" that we used in the last live session to illustarte the functions below.
+We will use the same dataset "bls_unemployment.csv" that we used in the last live session to illustrate the functions below.
 
 
 ```{r}
@@ -382,8 +388,8 @@ df <- read.csv("bls_unemployment.csv", header=TRUE, stringsAsFactors = FALSE)
   head(df)
   tail(df)
 
-#table(df$Series.id, useNA = "always")
-#table(df$Period, useNA = "always")
+table(df$Series.id, useNA = "always")
+table(df$Period, useNA = "always")
 
 # Convert a column of the data frame into a time-series object
 unemp <- ts(df$Value, start = c(2007,1), end = c(2017,1), frequency = 12)
@@ -506,7 +512,7 @@ unemp04['2013-10-01/2013-12-15']),2)
 ```
 
 ## Calculate difference in time series
-A very common operation on time series is to take a difference of the series to transform a non-stationary serier to a stationary series. First order differencing takes the form $x(t) - x(t-k)$ where $k$ denotes the number of time lags. Higher order differences are simply the reapplication of a difference to each prior result (like a second derivative or a difference of the difference).
+A very common operation on time series is to take a difference of the series to transform a non-stationary series to a stationary series. First order differencing takes the form $x(t) - x(t-k)$ where $k$ denotes the number of time lags. Higher order differences are simply the reapplication of a difference to each prior result (like a second derivative or a difference of the difference).
 
 Let's use the ```unemp_xts``` series as examples:
 ```{r}
@@ -528,7 +534,7 @@ diff(unemp_xts, lag = 12, differences = 1)
     A. Section 3.4 of "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
     
     B. the following questions in "xts FAQ"
-        a. I am using apply() to run a custom function on my xts series. Why the returned matrix has di↵erent dimensions than the original one?
+        a. I am using apply() to run a custom function on my xts series. Why the returned matrix has different dimensions than the original one?
 
   2. Follow the following two sections of this document
 
@@ -580,29 +586,89 @@ head(cbind(TWTR[,4], rollapply(TWTR[, 4], 10, FUN = mean, na.rm = TRUE)),15)
 1. Read AMAZ.csv and UMCSENT.csv into R as R DataFrames
 
 ```{r}
-amaz=read.csv('AMAZ.csv')
-umcsent=read.csv('UMCSENT.csv')
+amaz <- read.csv('AMAZ.csv')
+umcsent <- read.csv('UMCSENT.csv')
+
 head(amaz)
 tail(amaz)
+
+length(amaz$Index)
+
+head(umcsent)
+tail(umcsent)
+
+length(umcsent$Index)
 ```
 
 2. Convert them to xts objects
 
 ```{r}
-#amaz.xts=as.xts(amaz[,2:6],Index=as.Date(amaz$Index,"%Y-%m-%d"))
+amaz.xts <- as.xts(amaz[,2:6],order.by=as.Date(amaz$Index,format="%Y-%m-%d"))
+
+head(amaz.xts)
+tail(amaz.xts)
+
+umcsent.xts <- as.xts(umcsent[,2], order.by=as.Date(umcsent$Index, format="%Y-%d-%m"))
+
+head(umcsent.xts)
+tail(umcsent.xts)
 ```
 
-3. Merge the two set of series together, perserving all of the obserbvations in both set of series
-    a. fill all of the missing values of the UMCSENT series with -9999
+It is important to note here that the `amaz.xts` has a shorter duration and span than the `umcscent.xts` series. However, the `amaz.xts` series has more observations than `umcsent.xts`.
+
+3. Merge the two set of series together, perserving all of the observations in both set of series
+
+```{r}
+merged <- merge(amaz.xts, umcsent.xts, join="outer")
+head(merged)
+tail(merged)
+
+length(merged)
+```
     
-    b. then create a new series, named UMCSENT02, from the original  UMCSENT series replace all of the -9999 with NAs
+    a. fill all of the missing values of the UMCSENT series with -9999
+
+--SS: I'm a little confused here. Does he mean the original UMCSENT or the one we merged with?
+
+```{r}
+umcsent.na <- merge(amaz.xts, umcsent.xts, join="outer", fill = -9999)
+```
+    
+    b. then create a new series, named UMCSENT02, from the original UMCSENT series replace all of the -9999 with NAs
+
+--SS: I don't think the original has any -9999s?
+
+```{r}
+umcsent02 <- umcsent
+umcsent02[umcsent02 <= -9999 ] <- NA
+```
     
     c. then create a new series, named UMCSENT03, and replace the NAs with the last observation
+
+```{r}
+umcsent03 <- na.locf(umcsent02[,1], na.rm = TRUE, fromLast = TRUE) 
+```
     
     d. then create a new series, named UMCSENT04, and replace the NAs using linear interpolation.
     
+```{r}
+umcsent04 <- na.locf(umcsent02[,1], na.rm = TRUE, fromLast = FALSE)
+```
+    
     e. Print out some observations to ensure that your merge as well as the missing value imputation are done correctly. I leave it up to you to decide exactly how many observations to print; do something that makes sense. (Hint: Do not print out the entire dataset!)
+    
+```{r}
+
+```
 
 4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
 
+```{r}
+
+```
+
 5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
+
+```{r}
+
+```
