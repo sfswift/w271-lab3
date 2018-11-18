@@ -608,7 +608,7 @@ amaz.xts <- as.xts(amaz[,2:6],order.by=as.Date(amaz$Index,format="%Y-%m-%d"))
 head(amaz.xts)
 tail(amaz.xts)
 
-umcsent.xts <- as.xts(umcsent[,2], order.by=as.Date(umcsent$Index, format="%Y-%d-%m"))
+umcsent.xts <- as.xts(umcsent[,2], order.by=as.Date(umcsent$Index, format="%Y-%m-%d"))
 
 head(umcsent.xts)
 tail(umcsent.xts)
@@ -664,7 +664,10 @@ umcsent04 <- na.locf(umcsent02[,1], na.rm = TRUE, fromLast = FALSE)
 4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
 
 ```{r}
-
+f <- function(x) {
+  
+}
+head(cbind(TWTR[,4], rollapply(merged$AMAZ.close, 10, FUN = mean, na.rm = TRUE)),15)
 ```
 
 5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
