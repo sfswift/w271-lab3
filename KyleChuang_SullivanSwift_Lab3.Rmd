@@ -667,11 +667,15 @@ umcsent04 <- na.locf(umcsent02[,1], na.rm = TRUE, fromLast = FALSE)
 f <- function(x) {
   
 }
-head(cbind(TWTR[,4], rollapply(merged$AMAZ.close, 10, FUN = mean, na.rm = TRUE)),15)
 ```
 
 5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
 
 ```{r}
+head(cbind(merged$AMAZ.close[,4], rollapply(merged$AMAZ.close, 20, FUN = mean, na.rm = TRUE)),15)
+```
+
+```{r}
+head(cbind(merged$AMAZ.close[,4], rollapply(merged$AMAZ.close, 20, FUN = mean, na.rm = TRUE)),15)
 
 ```
