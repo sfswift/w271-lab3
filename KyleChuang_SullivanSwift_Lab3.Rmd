@@ -64,6 +64,8 @@ arimatable = function(m,dfts){
 
 Note: Custom function ts_plots() [plot time series], ts_resid() [plot residuals], forecast_exp() [exponentiate all values in forecasts objects] and arimatable() [summarizes arima table] are not included in the R pdf but is in the R-markdown file.
 
+In the following report, we analyze and model quarterly data of E-Commerce Retail Sales as the Percent of Total Sales. Our goal is to use the data, ranging from Q4 1999 to Q4 2016, to forecast predictions for each quarter in 2017. First we explore the data and determine what models to further pursue. We select two model to test in depth, including with in- and out-of-model sampling. We use our final model to make a 2017 prediction.
+
 ```{r echo=T,results='hide',message=F,fig.height=4}
 df=read.csv('ECOMPCTNSA.csv')
 head(df)
@@ -72,7 +74,7 @@ dfts=ts(df$ECOMPCTNSA,start=c(1999,4),end=c(2014,4),freq=4)
 ts_plots(dfts)
 ```
 
-There is clearly a seaonsonal component based on the plot. Additionally, the plot seems to be potentially heteroskedastic. We will log the time series to decrease the heteroskedasticity and re-analyze the time series from the starting point.
+There is clearly a seaonsonal component based on the plot. Additionally, the plot seems to be potentially heteroskedastic. We will perform a `log` transformation on the time series to decrease the heteroskedasticity and re-analyze the time series from the starting point.
 
 ```{r fig.height=4}
 dfts_log=log(dfts)
@@ -86,8 +88,6 @@ ggplot(data.frame(cycle=factor(cycle(dfts_log)),data=as.numeric(dfts_log)),aes(x
 ```
 
 The seasonal boxplot does not show significant differences in each of the quarters. However, this is possibly due to the trend component affecting the cycles. We will detrend the series first and re-examine the quarterly plots.
-
-First, the time series will be detrended using a first differencing and we examine the seasonality plot.
 
 ```{r fig.height=2}
 tmp=diff(dfts_log,lag=1)
@@ -103,15 +103,15 @@ adf.test(df_ds)
 pp.test(df_ds)
 ```
 
-The detrended and deseasonalized plot show the quarterly mean and variance is now similar across the quarters indicating a deseasonalized time series. Augmented Dickey-Fuller and Phillips-Perron test are performed on deseasonalized, detrended time series both rejecting the non-stationary hypothesis. With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will use the SARIMA model to model the original logged time series rather than modeling the detrended and deseasonalized logged data to combine the steps.
+The plot of the detrended and deseasonalized data shows the quarterly mean and variance is now similar across the quarters, indicating a deseasonalized time series. Augmented Dickey-Fuller and Phillips-Perron tests are performed on deseasonalized, detrended time series. Both tests reject the non-stationary hypothesis. 
+
+With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will use the SARIMA model to model the original logged time series rather than modeling the detrended and deseasonalized logged data, thus combining the steps.
 
 ```{r}
 ggtsdisplay(df_ds)
 ```
 
---SS Do we use the deseasonalized, detrended data to decide where to start with our SARIMA? or the original data?
-
-The t-plot shows the time series to have been detrended and deseasonalized. On the pacf plot, there appears to strong serial correlation quarterly as it oscillates towards zero. The acf plot has high serial correlation at the 4th lag. The strong acf at lag 4 and cycling towards 0 in pact suggest there is a SMA(1) component. 
+Reviewing the plots of the data we detrended and deseasonalized, we confirm the the time series to have been detrended and deseasonalized. On the PACF plot, there appears to strong serial correlation quarterly as it oscillates towards zero. The ACF plot has high serial correlation at the 4th lag. The strong ACF at lag 4 and cycling towards 0 in pact suggest there is a SMA(1) component. 
 
 Based on our exploration, the intial model will be $SARIMA(0,1,0)(0,1,1)_4$.
 
@@ -162,7 +162,7 @@ ts_resid(m.010210$residuals)
 
 We first note that these series seem comparable as a MA model can be inverted to become an AR model. An $SARIMA(0,1,0)(0,1,2)_4$ is very similar to $SARIMA(0,1,0)(2,1,0)_4$ from invertibility of MA models. 
 
-The 2 models will be chosen as potential candidates. We will examine both in-sample and out-out-sample fits to chose the final model.
+The 2 models will be chosen as potential candidates. We will examine both in-sample and out-of-sample fits to chose the final model.
 
 ```{r fig.height=3}
 actual=ts(df$ECOMPCTNSA,start=c(1999,4),freq=4)
@@ -630,8 +630,6 @@ dim(merged)
     
     a. fill all of the missing values of the UMCSENT series with -9999
 
---SS: I'm a little confused here. Does he mean the original UMCSENT or the one we merged with?
-
 ```{r}
 umcsent01=merged
 head(umcsent01)
@@ -640,8 +638,6 @@ head(umcsent01)
 ```
     
     b. then create a new series, named UMCSENT02, from the original UMCSENT series replace all of the -9999 with NAs
-
---SS: I don't think the original has any -9999s?
 
 ```{r}
 umcsent02 <- umcsent01
@@ -672,9 +668,7 @@ head(umcsent04['2007-01',],15)
     
     e. Print out some observations to ensure that your merge as well as the missing value imputation are done correctly. I leave it up to you to decide exactly how many observations to print; do something that makes sense. (Hint: Do not print out the entire dataset!)
     
-```{r}
-# Not can we just show what we did above? - suggestions welcome?
-```
+Observations to check the merge and imputation are printed in the above sections.
 
 4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
 
@@ -694,4 +688,3 @@ head(cbind(amaz.xts.close,diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na
 tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,20,FUN=mean,na.rm=TRUE)),15)
 tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,50,FUN=mean,na.rm=TRUE)),15)
 ```
-isfleijslfjeslifjes
