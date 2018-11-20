@@ -64,7 +64,9 @@ arimatable = function(m,dfts){
 
 Note: Custom function ts_plots() [plot time series], ts_resid() [plot residuals], forecast_exp() [exponentiate all values in forecasts objects] and arimatable() [summarizes arima table] are not included in the R pdf but is in the R-markdown file.
 
-In the following report, we analyze and model quarterly data of E-Commerce Retail Sales as the Percent of Total Sales. Our goal is to use the data, ranging from Q4 1999 to Q4 2016, to forecast predictions for each quarter in 2017. First we explore the data and determine what models to further pursue. We select two model to test in depth, including with in- and out-of-model sampling. We use our final model to make a 2017 prediction.
+In the following report, we analyze and model quarterly data of E-Commerce Retail Sales as the Percent of Total Sales. Our goal is to use the data, ranging from Q4 1999 to Q4 2016, to forecast predictions for each quarter in 2017. First we explore the data and determine what models to further pursue. We select two models to test in depth, including diagnostic tests and with in- and out-of-model sampling. We use our final model to make a 2017 prediction.
+
+We bgein by examining a timeseries plot, a histogram of the time series and the ACF and PACF plots.
 
 ```{r echo=T,results='hide',message=F,fig.height=4}
 df=read.csv('ECOMPCTNSA.csv')
@@ -96,7 +98,7 @@ ggplot(data.frame(cycle=factor(cycle(tmp)),data=as.numeric(tmp)),aes(x=cycle,y=d
 
 The detrended series shows a strong quarterly seasonality. The time series will be deseasonalized using a quarterly cycle.
 
-```{r results='markup'}
+```{r results='markup',fig.height=2}
 df_ds=diff(diff(dfts_log,lag=1),lag=4)
 ggplot(data.frame(cycle=factor(cycle(df_ds)),data=as.numeric(df_ds)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot() + ggtitle('Quarterly Detrended & Deseasonalized Time Series Plot')
 adf.test(df_ds)
@@ -105,28 +107,32 @@ pp.test(df_ds)
 
 The plot of the detrended and deseasonalized data shows the quarterly mean and variance is now similar across the quarters, indicating a deseasonalized time series. Augmented Dickey-Fuller and Phillips-Perron tests are performed on deseasonalized, detrended time series. Both tests reject the non-stationary hypothesis. 
 
-With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will use the SARIMA model to model the original logged time series rather than modeling the detrended and deseasonalized logged data, thus combining the steps.
+With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will use the SARIMA model to model the original log-transformed time series rather than modeling the detrended and deseasonalized logged data, thus combining the steps.
 
-```{r}
+```{r fig.height=4}
 ggtsdisplay(df_ds)
 ```
 
 Reviewing the plots of the data we detrended and deseasonalized, we confirm the the time series to have been detrended and deseasonalized. On the PACF plot, there appears to strong serial correlation quarterly as it oscillates towards zero. The ACF plot has high serial correlation at the 4th lag. The strong ACF at lag 4 and cycling towards 0 in pact suggest there is a SMA(1) component. 
 
-Based on our exploration, the intial model will be $SARIMA(0,1,0)(0,1,1)_4$.
+Based on our exploration, we know our model will have a seasonal period $s=4$, that we will need differencing of $d=1, D=1$. Our intial model will be $SARIMA(0,1,0)(0,1,1)_4$.
 
 ```{r}
-m = arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(0,1,1),period=4))
+m = arima(dfts_log,order=c(0,1,0),seasonal=list(order=c(0,1,1),period=4))
 xtable(arimatable(m,dfts_log))
 ```
 
-The SMA1 $\beta$ at -0.5167 with se. at $0.0975$ suggesting signficance. The $\beta_{sma1}$ does not cross zero.
+The SMA1 $\beta$ at $-0.5167$ with $SE=0.0975$ suggesting signficance. The $\beta_{sma1}$ does not cross zero.
 
-```{r}
+```{r fig.height=4}
 ts_resid(m$residuals)
 ```
 
-The t-plot of the residuals appears to be white noise with heteroskedasticity. We will not further attempt to fit the variance of the residuals with GARCH/ARCH models. The t-plot shows no trend or seasonality. The residuals appear to be a stationary white noise process (though not necessarily Gaussian white noise) from the augmented Dickey Fuller and Phillips-Perron Test. Finally, the Ljung-box test almost shows the residuals to be uncorrelated with a p-Value of 0.35 as confirmed by the visual inspection.
+```{r fig.height=3}
+hist(m$residuals)
+```
+
+The t-plot of the residuals appears to be white noise with heteroskedasticity. We will not further attempt to fit the variance of the residuals with GARCH/ARCH models. The t-plot shows no trend or seasonality. The residuals appear to be a stationary white noise process from the augmented Dickey Fuller and Phillips-Perron Test. Finally, the Ljung-box test almost shows the residuals to be uncorrelated with a p-Value of 0.35 as confirmed by the visual inspection.
 
 We will examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to aid in choosing our final model.
 
@@ -139,26 +145,33 @@ colnames(results) = c('p','d','q','P','D','Q','AIC','BIC','Log_Likelihood')
 xtable(head(results[order(results$AIC,results$BIC),],5))
 ```
 ```{r echo=F}
-arimatable(auto.arima(dfts_log),dfts_log)
+xtable(arimatable(auto.arima(dfts_log),dfts_log))
 ```
 
 Auto.arima() selected $SARIMA(0,1,0)(2,1,0)_4$. From the manual iterations and auto.arima(), $SARIMA(0,1,0)(0,1,2)_4$ and $SARIMA(0,1,0)(2,1,0)_4$ are chosen as the candidate models as they have the lowest AICs and BICs.
 
-In the $SARIMA(0,1,0)(0,1,2)_4$, $\beta$s appear to be statistically siginficant and the residuals do appear to be white noise with stationarity and no autocorrelation. The Ljung-Box p-Value is higher than the $SARIMA(0,1,0)(0,1,1)_4$ model. Note that the heteroskedasticity in residuals no longer appear.
+```{r fig.height=4}
+m.010210=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(2,1,0),period=4))
+xtable(arimatable(m.010210,dfts_log))
+ts_resid(m.010210$residuals)
+```
+```{r fig.height=3}
+hist(m.010210$residuals)
+```
 
-```{r}
+In the $SARIMA(0,1,0)(2,1,0)_4$, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is $.13$ and the heterskedasticity of the residuals is not evident.
+
+```{r fig.height=4}
 m.010012=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(0,1,2),period=4))
 xtable(arimatable(m.010012,dfts_log))
 ts_resid(m.010012$residuals)
 ```
 
-In the $SARIMA(0,1,0)(2,1,0)_4$, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is ???? and the heterskedasticity of the residuals is not evident.
-
-```{r}
-m.010210=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(2,1,0),period=4))
-xtable(arimatable(m.010210,dfts_log))
-ts_resid(m.010210$residuals)
+```{r fig.height=3}
+hist(m.010012$residuals)
 ```
+
+In the $SARIMA(0,1,0)(0,1,2)_4$, $\beta$s appear to be statistically siginficant and the residuals do appear to be white noise with stationarity and no autocorrelation. The Ljung-Box p-Value is higher than the $SARIMA(0,1,0)(0,1,1)_4$ model. Note that the heteroskedasticity in residuals no longer appear.
 
 We first note that these series seem comparable as a MA model can be inverted to become an AR model. An $SARIMA(0,1,0)(0,1,2)_4$ is very similar to $SARIMA(0,1,0)(2,1,0)_4$ from invertibility of MA models. 
 
@@ -200,6 +213,8 @@ forecast_sar=forecast_exp_func(forecast(m,h = 4))
 xtable(data.frame(forecast_sar))
 autoplot(forecast_sar,'Model') +autolayer(exp(fitted(m)),series='ARIMA(0,1,0)(2,1,0)[4]',position=position_jitter())+ ylab('ECOMPCTNSA')+ autolayer(exp(df_full_log),series='Actual')
 ```
+
+The forecast closely follows what we would expect of the trend going forward in 2017.
 
 KYLE - OWN TEST
 
@@ -262,325 +277,7 @@ library(ggplot2)
 
 # Question 2: Learning how to use the xts library
 
-## Materials covered in Question 2 of this lab
-
-  - Primarily the references listed in this document:
-
-      - "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich. 2008. (xts.pdf)
-      - "xts FAQ" by xts Development Team. 2013 (xts_faq.pdf)
-      - xts_cheatsheet.pdf
-
-# Task 1:
-
-  1. Read 
-    A. The **Introduction** section (Section 1), which only has 1 page of reading of xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
-    B. The first three questions in"xts FAQ"
-        a. What is xts?
-        b. Why should I use xts rather than zoo or another time-series package?
-        c. HowdoIinstallxts?
-    C. The "A quick introduction to xts and zoo objects" section in this document
-        
-  2. Read the "A quick introduction to xts and zoo objects" of this document
-
-# A quick introduction to xts and zoo objects
-
-### xts
-```xts```
-  - stands for eXtensible Time Series
-  - is an extended zoo object
-  - is essentially matrix + (time-based) index (aka, observation + time)
-
-  - xts is a constructor or a subclass that inherits behavior from parent (zoo); in fact, it extends the popular zoo class. As such. most zoo methods work for xts
-  - is a matrix objects; subsets always preserve the matrix form
-  - importantly, xts are indexed by a formal time object. Therefore, the data is time-stamped
-  - The two most important arguments are ```x``` for the data and ```order.by``` for the index. ```x``` must be a vector or matrix. ```order.by``` is a vector of the same length or number of rows of ```x```; it must be a proper time or date object and be in an increasing order
-
-# Task 2:
-
-  1. Read 
-    A. Section 3.1 of "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
-    
-    B. The following questions in "xts FAQ"
-        a. How do I create an xts index with millisecond precision?
-        b. OK, so now I have my millisecond series but I still can't see the milliseconds displayed. What went wrong?
-
-  2. Follow the following section of this document
-
-
-# Creating an xts object and converting to an xts object from an imported dataset
-
-We will create an `xts` object from a matrix and a time index. First, let's create a matrix and a time index.  The matrix, as it creates, is not associated with the time indext yet.
-
-```{r include=FALSE}
-rm(list = ls())
-library(knitr)
-opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
-```
-
-
-```{r}
-# Set working directory
-#wd <-"~/Documents/Teach/Cal/w271/_2018.03_Fall/labs/lab3"
-#setwd(wd)
-```
-
-```{r}
-# Create a matrix
-x <- matrix(rnorm(200), ncol=2, nrow=100)
-colnames(x) <- c("Series01", "Series02")
-str(x)
-head(x,10)
-
-idx <- seq(as.Date("2015/1/1"), by = "day", length.out = 100)
-str(idx)
-head(idx)
-tail(idx)
-```
-
-In a nutshell, `xts` is a matrix indexed by a time object. To create an xts object, we "bind" the object with the index.  Since we have already created a matrix and a time index (of the same length as the number of rows of the matrix), we are ready to "bind" them together. We will name it *X*.
-
-```{r}
-library(xts)
-X <- xts(x, order.by=idx)
-str(X)
-head(X,10)
-```
-
-As you can see from the structure of an `xts` objevct, it contains both a data component and an index, indexed by an objevct of class `Date`.
-
-**xtx constructor**
-
-```
-xts(x=Null,
-    order.by=index(x),
-    frequency=NULL,
-    unique=NULL,
-    tzone=Sys.getenv("TZ"))
-```
-As mentioned previous, the two most important arguments are ```x``` and ```order.by```.  In fact, we only use these two arguments to create a xts object before.
-
-
-With a xts object, one can decompose it.
-
-### Deconstructing xts
-
-```coredata()``` is used to extract the data component
-```{r}
-head(coredata(X),5)
-```
-
-```index()``` is used to extract the index (aka times)
-```{r}
-head(index(X),5)
-```
-  
-### Conversion to xts from other time-series objects
-
-We will use the same dataset "bls_unemployment.csv" that we used in the last live session to illustrate the functions below.
-
-
-```{r}
-df <- read.csv("bls_unemployment.csv", header=TRUE, stringsAsFactors = FALSE)
-
-# Examine the data structure
-  str(df)
-  names(df)
-  head(df)
-  tail(df)
-
-table(df$Series.id, useNA = "always")
-table(df$Period, useNA = "always")
-
-# Convert a column of the data frame into a time-series object
-unemp <- ts(df$Value, start = c(2007,1), end = c(2017,1), frequency = 12)
-  str(unemp)
-  head(cbind(time(unemp), unemp),5)
-
-# Now, let's convert it to an xts object
-df_matrix <- as.matrix(df)
-  head(df_matrix)
-  str(df_matrix)
-  rownames(df)
-
-unemp_idx <- seq(as.Date("2007/1/1"), by = "month", length.out = 
-length(df[,1]))
-  head(unemp_idx)
-
-unemp_xts <- xts(df$Value, order.by = unemp_idx)
-  str(unemp_xts)
-  head(unemp_xts)
-```
-
-# Task 3:
-
-  1. Read 
-    A. Section 3.2 of "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
-    
-  2. Follow the following section of this document
-  
-# Merging and modifying time series
-
-One of the key strengths of ```xts``` is that it is easy to join data by column and row using a only few different functions. It makes creating time series datasets almost effortless.
-
-The important criterion is that the xts objects must be of identical type (e.g. integer + integer), or be POSIXct dates vector, or be atomic vectors of the same type (e.g. numeric), or be a single NA. It does not work on data.frames with various column types.
-
-The major functions is ```merge```.  It works like ```cbind``` or SQL's ```join```:
-
-Let's look at an example. It assumes that you are familiar with concepts of inner join, outer join, left join, and right join.
-
-```{r}
-library(quantmod)
-getSymbols("TWTR")
-head(TWTR)
-str(TWTR)
-```
-
-Note that the date obtained from the getSymbols function of the quantmod library is already an xts object.  As such, we can merge it directly with our unemployment rate xts object constructed above. Nevertheless, it is instructive to examine the data using the View() function to ensure that you understand the number of observations resulting from the joined series.
-
-```{r}
-# 1. Inner join
-TWTR_unemp01 <- merge(unemp_xts, TWTR, join = "inner")
-  str(TWTR_unemp01)
-  head(TWTR_unemp01)
-
-# 2. Outer join (filling the missing observations with 99999)
-# Basic argument use
-TWTR_unemp02 <- merge(unemp_xts, TWTR, join = "outer", fill = 99999)
-  str(TWTR_unemp02)
-  head(TWTR_unemp02)
-  #View(TWTR_unemp02)
-
-# Left join
-TWTR_unemp03 <- merge(unemp_xts, TWTR, join = "left", fill = 99999)
-  str(TWTR_unemp03)
-  head(TWTR_unemp03)
-  #View(TWTR_unemp03)
-  
-# Right join
-TWTR_unemp04 <- merge(unemp_xts, TWTR, join = "right", fill = 99999)
-  str(TWTR_unemp04)
-  head(TWTR_unemp04)
-  #View(TWTR_unemp04)
-```
-
-# Missing value imputation
-xts also offers methods that allows filling missing values using last or previous observation. Note that I include this simply to point out that this is possible. I by no mean certify that this is the preferred method of imputing missing values in a time series.  As I mentioned in live session, the specific method to use in missing value imputation is completely context dependent.
-
-Filling missing values from the last observation
-```{r}
-# First, let's replace the "99999" values with NA and then exammine the series. 
-
-# Let's examine the first few dozen observations with NA
-TWTR_unemp02['2013-10-01/2013-12-15'][,1]
-
-# Replace observations with "99999" with NA and store in a new series
-unemp01 <- TWTR_unemp02[, 1]
-unemp01['2013-10-01/2013-12-15']
-str(unemp01)
-head(unemp01)
-#TWTR_unemp02[, 1][TWTR_unemp02[, 1] >= 99990] <- NA
-
-unemp02 <- unemp01
-unemp02[unemp02 >= 99990] <- NA
-
-cbind(unemp01['2013-10-01/2013-12-15'], unemp02['2013-10-01/2013-12-15'])
-
-# Impute the missing values (stored as NA) with the last observation
-TWTR_unemp02_v2a <- na.locf(TWTR_unemp02[,1], 
-                            na.rm = TRUE, fromLast = TRUE) 
-unemp03 <- unemp02
-unemp03 <- na.locf(unemp03, na.rm = TRUE, fromLast = FALSE);
-
-# Examine the pre- and post-imputed series
-cbind(TWTR_unemp02['2013-10-01/2013-12-30'][,1], TWTR_unemp02_v2a['2013-10-01/2013-12-15'])
-
-cbind(unemp01['2013-10-01/2013-12-15'], unemp02['2013-10-01/2013-12-15'],
-unemp03['2013-10-01/2013-12-15'])
-```
-
-Another missing value imputation method is linear interpolation, which can also be easily done in xts objects. In the following example, we use linear interpolation to fill in the NA in between months.  The result is stored in ```unemp04```. Note in the following the different ways of imputing missing values.
-
-```{r}
-unemp04 <- unemp02
-unemp04['2013-10-01/2014-02-01']
-unemp04 <- na.approx(unemp04, maxgap=31)
-unemp04['2013-10-01/2014-02-01']
-
-round(cbind(unemp01['2013-10-01/2013-12-15'], unemp02['2013-10-01/2013-12-15'],
-unemp03['2013-10-01/2013-12-15'],
-unemp04['2013-10-01/2013-12-15']),2)
-```
-
-## Calculate difference in time series
-A very common operation on time series is to take a difference of the series to transform a non-stationary series to a stationary series. First order differencing takes the form $x(t) - x(t-k)$ where $k$ denotes the number of time lags. Higher order differences are simply the reapplication of a difference to each prior result (like a second derivative or a difference of the difference).
-
-Let's use the ```unemp_xts``` series as examples:
-```{r}
-str(unemp_xts)
-unemp_xts
- 
-diff(unemp_xts, lag = 1, difference = 1, log = FALSE, na.pad = TRUE)
-
-# calculate the first difference of AirPass using lag and subtraction
-#AirPass - lag(AirPass, k = 1)
-
-# calculate the first order 12-month difference if AirPass
-diff(unemp_xts, lag = 12, differences = 1)
-```
-
-# Task 4:
-
-  1. Read 
-    A. Section 3.4 of "xts: Extensible Time Series" by Jeffrey A. Ryan and Joshua M. Ulrich
-    
-    B. the following questions in "xts FAQ"
-        a. I am using apply() to run a custom function on my xts series. Why the returned matrix has different dimensions than the original one?
-
-  2. Follow the following two sections of this document
-
-# Apply various functions to time series
-
-The family of ```apply``` functions perhaps is one of the most powerful R function families. In time series, ```xts``` provides ```period.apply```, which takes (1) a time series, (2) an index of endpoints, and (3) a function to apply.  It takes the following general form:
-```
-period.apply(x, INDEX, FUN, ...)
-```
-
-As an example, we use the Twitter stock price series (to be precise, the daily closing price), create an index storing the points corresopnding to the weeks of the daily series, and apply functions to calculate the weekly mean. 
-
-```{r}
-# Step 1: Identify the endpoints; in this case, we use weekly time interval. That is, we extract the end index on each week of the series
-
-#View(TWTR)
-head(TWTR)
-TWTR_ep <- endpoints(TWTR[,4], on = "weeks")
-#TWTR_ep
-
-# Step 2: Calculate the weekly mean
-TWTR.Close_weeklyMean <- period.apply(TWTR[, 4], INDEX = TWTR_ep, FUN = mean)
-head(round(TWTR.Close_weeklyMean,2),8)
-```
-
-The power of the apply function really comes with the use of custom-defined function. For instance, we can easily 
-
-```{r}
-f <- function(x) {
-  mean <- mean(x)
-  quantile <- quantile(x,c(0.05,0.25,0.50,0.75,0.95))
-  sd <- sd(x)
-  
-  result <- c(mean, sd, quantile)
-  return(result)
-}
-head(round(period.apply(TWTR[, 4], INDEX = TWTR_ep, FUN = f),2),10)
-```
-
-# Calculate basic rolling statistics  of series by month
-Using ```rollapply```, one can calculate rolling statistics of a series:
-
-```{r}
-# Calculate rolling mean over a 10-day period and print it with the original series
-head(cbind(TWTR[,4], rollapply(TWTR[, 4], 10, FUN = mean, na.rm = TRUE)),15)
-```
+Only Task 5 is left for brevity.
 
 # Task 5:
 1. Read AMAZ.csv and UMCSENT.csv into R as R DataFrames
@@ -589,15 +286,11 @@ head(cbind(TWTR[,4], rollapply(TWTR[, 4], 10, FUN = mean, na.rm = TRUE)),15)
 library(xts)
 amaz <- read.csv('AMAZ.csv')
 umcsent <- read.csv('UMCSENT.csv')
-
-head(amaz)
-tail(amaz)
-
+xtable(head(amaz))
+xtable(tail(amaz))
 length(amaz$Index)
-
-head(umcsent)
-tail(umcsent)
-
+xtable(head(umcsent))
+xtable(tail(umcsent))
 length(umcsent$Index)
 ```
 
@@ -605,15 +298,12 @@ length(umcsent$Index)
 
 ```{r}
 amaz.xts <- as.xts(amaz[,2:6],order.by=as.Date(amaz$Index,format="%Y-%m-%d"))
-
-head(amaz.xts)
-tail(amaz.xts)
-
+xtable(head(amaz.xts))
+xtable(tail(amaz.xts))
 umcsent.xts <- as.xts(umcsent[,2], order.by=as.Date(umcsent$Index, format="%Y-%d-%m"))
 colnames(umcsent.xts)=c('umcsent')
-
-head(umcsent.xts)
-tail(umcsent.xts)
+xtable(head(umcsent.xts))
+xtable(tail(umcsent.xts))
 ```
 
 It is important to note here that the `amaz.xts` has a shorter duration and span than the `umcscent.xts` series. However, the `amaz.xts` series has more observations than `umcsent.xts`.
@@ -622,9 +312,8 @@ It is important to note here that the `amaz.xts` has a shorter duration and span
 
 ```{r}
 merged <- merge(amaz.xts, umcsent.xts, join="outer")
-head(merged)
-tail(merged)
-
+xtable(head(merged))
+xtable(tail(merged))
 dim(merged)
 ```
     
@@ -632,38 +321,38 @@ dim(merged)
 
 ```{r}
 umcsent01=merged
-head(umcsent01)
+xtable(head(umcsent01))
 umcsent01=na.fill(umcsent01,-9999)
-head(umcsent01)
+xtable(head(umcsent01))
 ```
     
     b. then create a new series, named UMCSENT02, from the original UMCSENT series replace all of the -9999 with NAs
 
 ```{r}
 umcsent02 <- umcsent01
-head(umcsent02)
+xtable(head(umcsent02))
 umcsent02[umcsent02 <= -9999 ] <- NA
-head(umcsent02)
+xtable(head(umcsent02))
 ```
     
     c. then create a new series, named UMCSENT03, and replace the NAs with the last observation
 
 ```{r}
 umcsent03=umcsent02
-head(umcsent03)
+xtable(head(umcsent03))
 umcsent03 <- na.locf(umcsent02, na.rm = TRUE, fromLast = TRUE) 
-head(umcsent03)
+xtable(head(umcsent03))
 ```
     
     d. then create a new series, named UMCSENT04, and replace the NAs using linear interpolation.
     
 ```{r}
 umcsent04=umcsent02
-head(umcsent04)
-head(umcsent04['2007-01',],15)
+xtable(head(umcsent04))
+xtable(head(umcsent04['2007-01',],15))
 umcsent04=na.approx(umcsent04,maxgap=10000)
-# Note amazon has N/As in 1/1/17 and 1/2/17 because there is no data before 1/1/03 so there isnothing to interpolate
-head(umcsent04['2007-01',],15)
+# Note amazon has N/As in 1/1/17 and 1/2/17 because there is no data before 1/1/03 so there is nothing to interpolate
+xtable(head(umcsent04['2007-01',],15))
 ```
     
     e. Print out some observations to ensure that your merge as well as the missing value imputation are done correctly. I leave it up to you to decide exactly how many observations to print; do something that makes sense. (Hint: Do not print out the entire dataset!)
@@ -674,10 +363,10 @@ Observations to check the merge and imputation are printed in the above sections
 
 ```{r}
 amaz.xts.close=amaz.xts$AMAZ.Close
-head(amaz.xts.close)
-head(diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=FALSE))
-head(diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=FALSE)/amaz.xts.close)
-head(cbind(amaz.xts.close,diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=TRUE),diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=TRUE)/amaz.xts.close))
+xtable(head(amaz.xts.close))
+xtable(head(diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=FALSE)))
+xtable(head(diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=FALSE)/amaz.xts.close))
+xtable(head(cbind(amaz.xts.close,diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=TRUE),diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=TRUE)/amaz.xts.close)))
 # another way to do it in 1 long line...
 #head(diff(amaz.xts$AMAZ.Close,lag=1,differences=1,log=F,na.pad=F)/amaz.xts$AMAZ.Close)
 ```
@@ -685,6 +374,6 @@ head(cbind(amaz.xts.close,diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na
 5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
 
 ```{r}
-tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,20,FUN=mean,na.rm=TRUE)),15)
-tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,50,FUN=mean,na.rm=TRUE)),15)
+xtable(tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,20,FUN=mean,na.rm=TRUE)),15))
+xtable(tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,50,FUN=mean,na.rm=TRUE)),15))
 ```
