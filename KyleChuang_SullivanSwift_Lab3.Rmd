@@ -1,7 +1,7 @@
 ---
 title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data (W271):
   Lab 3'
-author: "PKyle Chuang and Sullivan Swift"
+author: "Kyle Chuang and Sullivan Swift"
 geometry: margin=1in
 output:
   pdf_document:
@@ -16,6 +16,9 @@ require(knitr)
 knitr::opts_chunk$set(echo = TRUE)
 opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE,results='asis',warning = FALSE,fig.height=3)
 options(xtable.comment=FALSE)
+options(xtable.floating=FALSE)
+options(xtable.NA.string='NA')
+options(xtable.table.placement="!h")
 library(lmtest) 
 library(ggplot2)
 library(tseries)
@@ -24,8 +27,6 @@ library(forecast)
 library(xtable)
 ```
 ```{r include=FALSE}
-# setwd('~/Documents/Classes/W271 - Advanced Statistical Methods/f18-kchuangk/')
-
 ts_plots = function(x) {
    par(mfrow=c(2,2),par=c(2,2,2,2))
    plot(x,main='t-Plot')
@@ -35,12 +36,16 @@ ts_plots = function(x) {
 }
 
 ts_resid = function(x){
-  par(mar=c(2,2,2,2))
-  ggtsdisplay(x) 
+  par(mfrow=c(2,2),par=c(2,2,2,2))
+  plot(x,main='t-Plot')
+  qqnorm(x)
+  qqline(x,col='red')
+  acf(x)
+  pacf(x)
   d=data.frame(PhillipsPerron=pp.test(x)$p.value,
-                      AugmentedDickeyFuller=adf.test(x)$p.value,
-                      LjungBox=Box.test(x,type='Ljung-Box')$p.value)
-  row.names(d)=c('p-Value')
+               AugmentedDickeyFuller=adf.test(x)$p.value,
+               LjungBox=Box.test(x,type='Ljung-Box')$p.value,
+               ShapiroWilkes=shapiro.test(x)$p.value)
   xtable(d)
 }
 
@@ -58,15 +63,24 @@ arimatable = function(m,dfts){
   colnames(tbl)=c('beta','SE','Sigma2','AIC','BIC','LogLik','ME','RMSE','MAE')
   return(tbl)
 }
+
+run_arima_loop = function(x) {
+  results=data.frame(matrix(ncol=9,nrow=0))
+  for (p in 0:2){ for (q in 0:2) { for (PS in 0:2) { for (QS in 0:2) {
+          m.tmp=arima(x,order=c(p,1,q),seasonal = list(order=c(PS,1,QS),period=4))
+          results=rbind(results,c(p=p,d=1, q=q,P=PS,D=1,Q=QS,AIC=AIC(m.tmp),BIC=BIC(m.tmp),Log_Likelihood=m.tmp$loglik)) } } } }
+  colnames(results) = c('p','d','q','P','D','Q','AIC','BIC','Log_Likelihood')
+  return(results)
+}
 ```
 
 # Question 1: Forecasting using a SARIMA model
 
-Note: Custom function ts_plots() [plot time series], ts_resid() [plot residuals], forecast_exp() [exponentiate all values in forecasts objects] and arimatable() [summarizes arima table] are not included in the R pdf but is in the R-markdown file.
+Note: Custom function ts_plots() [plot time series], ts_resid() [plot residuals], forecast_exp() [exponentiate all values in forecasts objects], arimatable() [summarizes arima table] and run_arima_loop [loop through $p$ and $q$ variables on an arima model] are not included in the R pdf but is in the R-markdown file.
 
-In the following report, we analyze and model quarterly data of E-Commerce Retail Sales as the Percent of Total Sales. Our goal is to use the data, ranging from Q4 1999 to Q4 2016, to forecast predictions for each quarter in 2017. First we explore the data and determine what models to further pursue. We select two models to test in depth, including diagnostic tests and with in- and out-of-model sampling. We use our final model to make a 2017 prediction.
+In the following report, we analyze and model quarterly data of E-Commerce Retail Sales as the Percent of Total Sales. Our goal is to use the data, ranging from Q4 1999 to Q4 2016, to forecast predictions for each quarter in 2017. First we explore the data and determine what models to further pursue. We selected two models to test in depth, including diagnostic tests and with in- and out-of-model sampling. We use our final model to make a 2017 prediction.
 
-We bgein by examining a timeseries plot, a histogram of the time series and the ACF and PACF plots.
+We begin by examining a time series plot, a histogram of the time series and the ACF and PACF plots.
 
 ```{r echo=T,results='hide',message=F,fig.height=4}
 df=read.csv('ECOMPCTNSA.csv')
@@ -89,7 +103,7 @@ From the logged time series plots, there is a trend and seasonal component. The 
 ggplot(data.frame(cycle=factor(cycle(dfts_log)),data=as.numeric(dfts_log)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot()
 ```
 
-The seasonal boxplot does not show significant differences in each of the quarters. However, this is possibly due to the trend component affecting the cycles. We will detrend the series first and re-examine the quarterly plots.
+The seasonal boxplot does not show significant mean and variance differences in each of the quarters. However, this is possibly due to the trend component affecting the cycles. We will detrend the series by first differencing and re-examine the quarterly plots.
 
 ```{r fig.height=2}
 tmp=diff(dfts_log,lag=1)
@@ -101,19 +115,23 @@ The detrended series shows a strong quarterly seasonality. The time series will 
 ```{r results='markup',fig.height=2}
 df_ds=diff(diff(dfts_log,lag=1),lag=4)
 ggplot(data.frame(cycle=factor(cycle(df_ds)),data=as.numeric(df_ds)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot() + ggtitle('Quarterly Detrended & Deseasonalized Time Series Plot')
+```
+The plot of the detrended and deseasonalized data shows the quarterly mean and variance is now similar across the quarters, indicating a deseasonalized time series.
+
+Augmented Dickey-Fuller and Phillips-Perron tests are performed on deseasonalized, detrended time series (the residuals). Both tests reject the non-stationary hypothesis. With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. 
+
+```{r results='markup'}
 adf.test(df_ds)
 pp.test(df_ds)
 ```
 
-The plot of the detrended and deseasonalized data shows the quarterly mean and variance is now similar across the quarters, indicating a deseasonalized time series. Augmented Dickey-Fuller and Phillips-Perron tests are performed on deseasonalized, detrended time series. Both tests reject the non-stationary hypothesis. 
-
-With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will use the SARIMA model to model the original log-transformed time series rather than modeling the detrended and deseasonalized logged data, thus combining the steps.
+Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will use the SARIMA model to model the original log-transformed time series rather than modeling the detrended and deseasonalized residuals, thus, combining the steps.
 
 ```{r fig.height=4}
-ggtsdisplay(df_ds)
+ggtsdisplay(df_ds,main='Detrended, de-seaonalized residuals')
 ```
 
-Reviewing the plots of the data we detrended and deseasonalized, we confirm the the time series to have been detrended and deseasonalized. On the PACF plot, there appears to strong serial correlation quarterly as it oscillates towards zero. The ACF plot has high serial correlation at the 4th lag. The strong ACF at lag 4 and cycling towards 0 in pact suggest there is a SMA(1) component. 
+Reviewing the plots of the data we detrended and deseasonalized, we confirm that the time series to have been detrended and deseasonalized. On the PACF plot, there appears to strong serial quarterly correlation as it oscillates towards zero. The ACF plot has high serial correlation at the 4th lag. The strong ACF at lag 4 and cycling towards 0 in pact suggest there is a seasonal MA(1) [SMA1] component. 
 
 Based on our exploration, we know our model will have a seasonal period $s=4$, that we will need differencing of $d=1, D=1$. Our intial model will be $SARIMA(0,1,0)(0,1,1)_4$.
 
@@ -122,44 +140,37 @@ m = arima(dfts_log,order=c(0,1,0),seasonal=list(order=c(0,1,1),period=4))
 xtable(arimatable(m,dfts_log))
 ```
 
-The SMA1 $\beta$ at $-0.5167$ with $SE=0.0975$ suggesting signficance. The $\beta_{sma1}$ does not cross zero.
+The SMA1 $\beta$ at $-0.5167$ with $SE=0.0975$ suggest stationarity at the 95% confidence interval as it does not cross 1. It also does not cross 0 suggesting significance at lag 1.
 
 ```{r fig.height=4}
 ts_resid(m$residuals)
 ```
 
-```{r fig.height=3}
-hist(m$residuals)
-```
-
-The t-plot of the residuals appears to be white noise with heteroskedasticity. We will not further attempt to fit the variance of the residuals with GARCH/ARCH models. The t-plot shows no trend or seasonality. The residuals appear to be a stationary white noise process from the augmented Dickey Fuller and Phillips-Perron Test. Finally, the Ljung-box test almost shows the residuals to be uncorrelated with a p-Value of 0.35 as confirmed by the visual inspection.
+The t-plot of the residuals appears to be white noise with heteroskedasticity. We shouldd square the residuals and check the acf and pacf plots to and possibly model the variance with GARCH/ARCH model. It is beyond the scope of the lab. The t-plot shows no trend or seasonality. The residuals appear to be a stationary process from the augmented Dickey Fuller and Phillips-Perron Test. The Shapiro-Wilks tests, $p<0.05$, indicates non-normality of residuals. While this may cause inferences on the model to be invalid, we believe that the residual population distribution is normal based on Central Limit Theorem. Thus, the rejection of the $H_0$ in Shapiro-Wilks test may be potentially overlooked. Finally, the Ljung-box test with p-Value of 0.35 and visual inspection indicates uncorrelated residual, a property of white noise. From visual inspection and various test, we believe the residuals follow a Gaussian white noise process based on stationarity, normality and non-correlation.
 
 We will examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to aid in choosing our final model.
 
 ```{r}
-results=data.frame(matrix(ncol=9,nrow=0))
-for (p in 0:2){ for (q in 0:2) { for (PS in 0:2) { for (QS in 0:2) {
-        m.tmp=arima(dfts_log,order=c(p,1,q),seasonal = list(order=c(PS,1,QS),period=4))
-        results=rbind(results,c(p=p,d=1, q=q,P=PS,D=1,Q=QS,AIC=AIC(m.tmp),BIC=BIC(m.tmp),Log_Likelihood=m.tmp$loglik)) } } } }
-colnames(results) = c('p','d','q','P','D','Q','AIC','BIC','Log_Likelihood')
+results=run_arima_loop(dfts_log)
 xtable(head(results[order(results$AIC,results$BIC),],5))
 ```
-```{r echo=F}
+Auto.arima() selected $SARIMA(0,1,0)(2,1,0)_4$. 
+```{r}
 xtable(arimatable(auto.arima(dfts_log),dfts_log))
 ```
 
-Auto.arima() selected $SARIMA(0,1,0)(2,1,0)_4$. From the manual iterations and auto.arima(), $SARIMA(0,1,0)(0,1,2)_4$ and $SARIMA(0,1,0)(2,1,0)_4$ are chosen as the candidate models as they have the lowest AICs and BICs.
+From the manual iterations and auto.arima(), $SARIMA(0,1,0)(0,1,2)_4$ and $SARIMA(0,1,0)(2,1,0)_4$ are chosen as the candidate models as they have the lowest AICs and BICs.
+
+In the $SARIMA(0,1,0)(2,1,0)_4$ below, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is $.13$ and the heterskedasticity of the residuals is not evident. Though normality is rejected based on Shapiro-Wilks test, Central Limit Theorem is invoked. Based on visual inspections and statistical tests, we believe the residuals follow a Gaussian white noise process allowing testing and inferences.
 
 ```{r fig.height=4}
 m.010210=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(2,1,0),period=4))
 xtable(arimatable(m.010210,dfts_log))
 ts_resid(m.010210$residuals)
 ```
-```{r fig.height=3}
-hist(m.010210$residuals)
-```
 
-In the $SARIMA(0,1,0)(2,1,0)_4$, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is $.13$ and the heterskedasticity of the residuals is not evident.
+
+In the $SARIMA(0,1,0)(0,1,2)_4$ below, $\beta$s are statistically significant and the residuals do appear to be white noise with stationarity and no autocorrelation. The Ljung-Box p-Value is higher than the $SARIMA(0,1,0)(0,1,1)_4$ model. Note that the heteroskedasticity in residuals no longer appear. Here, the Shaprio-Wilks test also gives a significant p-value, $p<0.05$, indicating the distribution is non-normal, but once again, Central Limit Theorem is invoked.
 
 ```{r fig.height=4}
 m.010012=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(0,1,2),period=4))
@@ -167,15 +178,10 @@ xtable(arimatable(m.010012,dfts_log))
 ts_resid(m.010012$residuals)
 ```
 
-```{r fig.height=3}
-hist(m.010012$residuals)
-```
 
-In the $SARIMA(0,1,0)(0,1,2)_4$, $\beta$s appear to be statistically siginficant and the residuals do appear to be white noise with stationarity and no autocorrelation. The Ljung-Box p-Value is higher than the $SARIMA(0,1,0)(0,1,1)_4$ model. Note that the heteroskedasticity in residuals no longer appear.
+We first note that these model are very similar. The $SARIMA(0,1,0)(0,1,2)_4$ is invertible to $SARIMA(0,1,0)(2,1,0)_4$ from invertibility of MA models.  We note the roots of the $SARIMA(0,1,0)(0,1,2)_4$ are `r round(Mod(polyroot(c(1,-0.77,0.4))),2)` and the roots of $SARIMA(0,1,0)(2,1,0)_4$ are `r Mod(polyroot(c(1,0.8,0.25)))`. Both models are quite similar. 
 
-We first note that these series seem comparable as a MA model can be inverted to become an AR model. An $SARIMA(0,1,0)(0,1,2)_4$ is very similar to $SARIMA(0,1,0)(2,1,0)_4$ from invertibility of MA models. 
-
-The 2 models will be chosen as potential candidates. We will examine both in-sample and out-of-sample fits to chose the final model.
+The 2 models are chosen as potential candidates. We will examine both in-sample and out-of-sample fits to chose the final model.
 
 ```{r fig.height=3}
 actual=ts(df$ECOMPCTNSA,start=c(1999,4),freq=4)
@@ -204,76 +210,18 @@ y_t=y_{t-1}+y_{t-4}+-0.7851y_{t-4}+-0.23651y_{t-5}+\epsilon_t
 \]
 ```{r result='markup'}
 df_full_log=ts(log(df$ECOMPCTNSA),start=c(1999,4),freq=4)
-m=arima(df_full_log,order=c(0,1,0),seasonal = list(order=c(2,1,0),period=4))
+m=m.010210
 xtable(arimatable(m,df_full_log))
 ```
 The forecast for 2017 using $SARIMA(0,1,0)(2,1,0)_4$ is 
 ```{r}
+m=Arima(df_full_log,model=m)  # insert the new series into the m.010210 arima model
 forecast_sar=forecast_exp_func(forecast(m,h = 4))
 xtable(data.frame(forecast_sar))
 autoplot(forecast_sar,'Model') +autolayer(exp(fitted(m)),series='ARIMA(0,1,0)(2,1,0)[4]',position=position_jitter())+ ylab('ECOMPCTNSA')+ autolayer(exp(df_full_log),series='Actual')
 ```
 
 The forecast closely follows what we would expect of the trend going forward in 2017.
-
-KYLE - OWN TEST
-
-Furthermore, the residuals appear to be heteroskedastic. From the $residuals^2$ act and pacf plots, There appears to be an AR component in the volatility suggesting a GARCH(1,0) model.
-
-```{r}
-#library(fGarch)
-#m.garch=garchFit(~garch(1,0),m$residuals,trace=FALSE)
-#summary(m.garch)
-```
-
-```{r}
-ggtsdisplay(m$residuals^2)
-```
-```{r}
-tmp=diff(diff(dfts_log,lag=1),lag=4)
-ggtsdisplay(tmp)
-ggplot(data.frame(cycle=factor(cycle(tmp)),data=as.numeric(tmp)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot()
-```
-
-```{r}
-#ggplot(data.frame(r=residuals(m.garch)),aes(sample=r))+geom_qq()+geom_qq_line(col='red')
-#hist(residuals(m.garch))
-#predict(m.garch)
-```
-The series appear to be detrended and deseaonalized. From the ACF gaph
-
-```{r fig.height=4}
-par(mfrow=c(2,2))
-plot(dfts_log)
-hist(dfts_log)
-acf(dfts_log,lag=12)
-pacf(dfts_log,lag=12)
-```
-
-The initial model proposed is a $SARIMA(1,1,0)(0,0,1)_4$ model.
-
-```{r}
-m=arima(dfts_log,order=c(1,1,0),seasonal=list(order=c(0,0,1),period=4))
-```
-
-The AR(1) component is likely to be 0 given the -0.0705 $\beta$ and s.e. of 0.1347. The SMA(1) $\beta$ appears siginificant. We will examine the residuals to see if the I(1) has removed the trend.
-
-From the t-plot, the I(1) appears to have removed the trend. The seasonality does not seem to be removed but m
-```{r fig.height=7}
-par(mfrow=c(2,2))
-plot(m$residuals)
-hist(m$residuals)
-acf(m$residuals,lag=12)
-pacf(m$residuals,lag=12)
-plot(window(m$residuals,start=c(2008,1),end=c(2014,4)))
-```
-
-\newpage
-
-```{r}
-library(ggplot2)
-```
-
 
 # Question 2: Learning how to use the xts library
 
@@ -308,7 +256,7 @@ xtable(tail(umcsent.xts))
 
 It is important to note here that the `amaz.xts` has a shorter duration and span than the `umcscent.xts` series. However, the `amaz.xts` series has more observations than `umcsent.xts`.
 
-3. Merge the two set of series together, perserving all of the observations in both set of series
+3. Merge the two set of series together, perserving all of the observations in both set of series 
 
 ```{r}
 merged <- merge(amaz.xts, umcsent.xts, join="outer")
@@ -351,7 +299,11 @@ umcsent04=umcsent02
 xtable(head(umcsent04))
 xtable(head(umcsent04['2007-01',],15))
 umcsent04=na.approx(umcsent04,maxgap=10000)
-# Note amazon has N/As in 1/1/17 and 1/2/17 because there is no data before 1/1/03 so there is nothing to interpolate
+```
+
+Note amazon has N/As in 1/1/17 and 1/2/17 because there is no data before 1/1/03 so there is nothing to interpolate.
+
+```{r}
 xtable(head(umcsent04['2007-01',],15))
 ```
     
@@ -364,14 +316,22 @@ Observations to check the merge and imputation are printed in the above sections
 ```{r}
 amaz.xts.close=amaz.xts$AMAZ.Close
 xtable(head(amaz.xts.close))
-xtable(head(diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=FALSE)))
-xtable(head(diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=FALSE)/amaz.xts.close))
-xtable(head(cbind(amaz.xts.close,diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=TRUE),diff(amaz.xts.close,lag=1,differences = 1,log=FALSE,na.pad=TRUE)/amaz.xts.close)))
-# another way to do it in 1 long line...
-#head(diff(amaz.xts$AMAZ.Close,lag=1,differences=1,log=F,na.pad=F)/amaz.xts$AMAZ.Close)
+xtable(head(diff(amaz.xts.close,lag=1,
+                 differences=1,log=FALSE,na.pad=FALSE)))
+xtable(head(diff(amaz.xts.close,lag=1,
+                 differences=1,log=FALSE,na.pad=FALSE)/amaz.xts.close))
+tmp=cbind(amaz.xts.close,diff(amaz.xts.close,lag=1,differences=1,log=FALSE,na.pad=TRUE),diff(amaz.xts.close,lag=1,differences=1,log=FALSE,na.pad=TRUE)/amaz.xts.close)
+colnames(tmp)=c('Close','Chg','PctChg')
+xtable(head(tmp))
+```
+
+```{r}
+plot(tmp$PctChg, main="Daily Return")
 ```
 
 5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
+
+The numbers below look odd but it is correct. AMAZ became a penny stock. Note, AMAZ is not Amazon.
 
 ```{r}
 xtable(tail(cbind(amaz.xts.close,rollapply(amaz.xts.close,20,FUN=mean,na.rm=TRUE)),15))
