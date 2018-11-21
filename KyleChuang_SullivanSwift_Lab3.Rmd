@@ -47,6 +47,8 @@ ts_resid = function(x){
                LjungBox=Box.test(x,type='Ljung-Box')$p.value,
                ShapiroWilkes=shapiro.test(x)$p.value)
   xtable(d)
+  
+  ShapiroWilks <- shapiro.test(x)$p.value
 }
 
 forecast_exp_func=function(x){
@@ -143,7 +145,8 @@ xtable(arimatable(m,dfts_log))
 The SMA1 $\beta$ at $-0.5167$ with $SE=0.0975$ suggest stationarity at the 95% confidence interval as it does not cross 1. It also does not cross 0 suggesting significance at lag 1.
 
 ```{r fig.height=4}
-ts_resid(m$residuals)
+res <- ts_resid(m$residuals)
+res
 ```
 
 The t-plot of the residuals appears to be white noise with heteroskedasticity. We shouldd square the residuals and check the acf and pacf plots to and possibly model the variance with GARCH/ARCH model. It is beyond the scope of the lab. The t-plot shows no trend or seasonality. The residuals appear to be a stationary process from the augmented Dickey Fuller and Phillips-Perron Test. The Shapiro-Wilks tests, $p<0.05$, indicates non-normality of residuals. While this may cause inferences on the model to be invalid, we believe that the residual population distribution is normal based on Central Limit Theorem. Thus, the rejection of the $H_0$ in Shapiro-Wilks test may be potentially overlooked. Finally, the Ljung-box test with p-Value of 0.35 and visual inspection indicates uncorrelated residual, a property of white noise. From visual inspection and various test, we believe the residuals follow a Gaussian white noise process based on stationarity, normality and non-correlation.
