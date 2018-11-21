@@ -133,7 +133,7 @@ Since the there are $I(1)$ and $I(1)_4$ components in the time series, we will u
 ggtsdisplay(df_ds,main='Detrended, de-seaonalized residuals')
 ```
 
-Reviewing the plots of the data we detrended and deseasonalized, we confirm that the time series to have been detrended and deseasonalized. On the PACF plot, there appears to strong serial quarterly correlation as it oscillates towards zero. The ACF plot has high serial correlation at the 4th lag. The strong ACF at lag 4 and cycling towards 0 in pact suggest there is a seasonal MA(1) [SMA1] component. 
+Reviewing the residuals of the detrended and deseasonalized data, we can confirm the removal of the trend and seasonality. On the PACF plot, there appears to strong serial quarterly correlation as it oscillates towards zero. The ACF plot has high serial correlation at the 4th lag. The strong ACF at lag 4 and cycling towards 0 in PACF suggest there is a seasonal MA(1) [SMA1] component. 
 
 Based on our exploration, we know our model will have a seasonal period $s=4$, that we will need differencing of $d=1, D=1$. Our intial model will be $SARIMA(0,1,0)(0,1,1)_4$.
 
@@ -149,7 +149,7 @@ res <- ts_resid(m$residuals)
 res
 ```
 
-The t-plot of the residuals appears to be white noise with heteroskedasticity. We shouldd square the residuals and check the acf and pacf plots to and possibly model the variance with GARCH/ARCH model. It is beyond the scope of the lab. The t-plot shows no trend or seasonality. The residuals appear to be a stationary process from the augmented Dickey Fuller and Phillips-Perron Test. The Shapiro-Wilks tests, $p<0.05$, indicates non-normality of residuals. While this may cause inferences on the model to be invalid, we believe that the residual population distribution is normal based on Central Limit Theorem. Thus, the rejection of the $H_0$ in Shapiro-Wilks test may be potentially overlooked. Finally, the Ljung-box test with p-Value of 0.35 and visual inspection indicates uncorrelated residual, a property of white noise. From visual inspection and various test, we believe the residuals follow a Gaussian white noise process based on stationarity, normality and non-correlation.
+The t-plot of the residuals appears to be white noise with heteroskedasticity. We should square the residuals and check the acf and pacf plots to possibly model the variance with GARCH/ARCH model. It is beyond the scope of the lab. The t-plot shows no trend or seasonality. The residuals appear to be a stationary process from the augmented Dickey Fuller and Phillips-Perron Test. The Shapiro-Wilks tests, $p<0.05$, indicates non-normality of residuals. While this may cause inferences on the model to be invalid, we believe that the residual population distribution is normal based on Central Limit Theorem. Thus, the rejection of the $H_0$ in Shapiro-Wilks test may be potentially overlooked. Finally, the Ljung-box test with p-Value of 0.35 and visual inspection indicates uncorrelated residual, a property of white noise. From visual inspection and various test, we believe the residuals follow a Gaussian white noise process based on stationarity, normality and non-correlation.
 
 We will examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to aid in choosing our final model.
 
@@ -164,7 +164,7 @@ xtable(arimatable(auto.arima(dfts_log),dfts_log))
 
 From the manual iterations and auto.arima(), $SARIMA(0,1,0)(0,1,2)_4$ and $SARIMA(0,1,0)(2,1,0)_4$ are chosen as the candidate models as they have the lowest AICs and BICs.
 
-In the $SARIMA(0,1,0)(2,1,0)_4$ below, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is $.13$ and the heterskedasticity of the residuals is not evident. Though normality is rejected based on Shapiro-Wilks test, Central Limit Theorem is invoked. Based on visual inspections and statistical tests, we believe the residuals follow a Gaussian white noise process allowing testing and inferences.
+In the $SARIMA(0,1,0)(2,1,0)_4$ below, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is $.13$ and the heterskedasticity of the residuals is not evident. Though normality is rejected based on Shapiro-Wilks test, Central Limit Theorem is invoked. Based on visual inspections and statistical tests, we believe the residuals follow a Gaussian white noise process allowing for testing and inferences.
 
 ```{r fig.height=4}
 m.010210=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(2,1,0),period=4))
@@ -182,7 +182,7 @@ ts_resid(m.010012$residuals)
 ```
 
 
-We first note that these model are very similar. The $SARIMA(0,1,0)(0,1,2)_4$ is invertible to $SARIMA(0,1,0)(2,1,0)_4$ from invertibility of MA models.  We note the roots of the $SARIMA(0,1,0)(0,1,2)_4$ are `r round(Mod(polyroot(c(1,-0.77,0.4))),2)` and the roots of $SARIMA(0,1,0)(2,1,0)_4$ are `r Mod(polyroot(c(1,0.8,0.25)))`. Both models are quite similar. 
+We first note that these model are very similar. We note the roots of the $SARIMA(0,1,0)(0,1,2)_4$ are `r round(Mod(polyroot(c(1,-0.77,0.4))),2)` and the roots of $SARIMA(0,1,0)(2,1,0)_4$ are `r Mod(polyroot(c(1,0.8,0.25)))`. The $SARIMA(0,1,0)(0,1,2)_4$ is invertible to $SARIMA(0,1,0)(2,1,0)_4$. Both models are quite similar. 
 
 The 2 models are chosen as potential candidates. We will examine both in-sample and out-of-sample fits to chose the final model.
 
@@ -194,7 +194,7 @@ autoplot(forecast_sar) +autolayer(exp(fitted(m.010210)),series='ARIMA(0,1,0)(2,1
 autoplot(forecast_sma) +autolayer(exp(fitted(m.010012)),series='ARIMA(0,1,0)(0,1,2)[4]',position=position_jitter())+ autolayer(actual) + ylab('ECOMPCTNSA')
 ```
 
-The in-sample fits for both models are extremely close to the historical fit. The predictions for both models are extremely similar. We will select the models based on accuracy of the time series. The time series is logged to avoid overweighting the larger values on the time series due to the trend.
+The in-sample fits for both models are extremely close to the historical fit. The predictions for both models are extremely similar. We will select the models based on accuracy of the time series. The time series is logged to avoid overweighting the larger values on the time series due to the trend and seasonality.
 
 ```{r}
 pred_test=window(log(actual),start=c(2015,1))
@@ -207,8 +207,8 @@ Every accuracy measure tested showed a lower error with $SARIMA(0,1,0)(2,1,0)_4$
 \[
 \begin{aligned}
 &SARIMA(0,1,0)(2,1,0)_4 \\
-(1-0.7851B-0.23651B^2)_4(1-B)_4(1-B)x_t&=\epsilon_t \\
-y_t=y_{t-1}+y_{t-4}+-0.7851y_{t-4}+-0.23651y_{t-5}+\epsilon_t
+(1-0.80-0.225^2)_4(1-B)_4(1-B)x_t&=\epsilon_t \\
+y_t=y_{t-1}+y_{t-4}+-0.80{t-4}+-0.25{t-5}+\epsilon_t
 \end{aligned}
 \]
 ```{r result='markup'}
