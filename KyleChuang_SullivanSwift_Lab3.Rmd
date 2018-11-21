@@ -203,12 +203,15 @@ xtable(accuracy(forecast(m.010012),pred_test),caption='$ARIMA(0,1,0)(0,1,2)_4$')
 ```
 
 Every accuracy measure tested showed a lower error with $SARIMA(0,1,0)(2,1,0)_4$ model. The final model chosen is
-# CHECK BELOW
 \[
 \begin{aligned}
 &SARIMA(0,1,0)(2,1,0)_4 \\
-(1-0.80-0.225^2)_4(1-B)_4(1-B)x_t&=\epsilon_t \\
-y_t=y_{t-1}+y_{t-4}+-0.80{t-4}+-0.25{t-5}+\epsilon_t
+(1-0.80B-0.25B^2)_4(1-B)_4(1-B)x_t&=\epsilon_t \\ 
+(1-0.80B-0.25B^2)_4(x_t-x_{t-1}-x_{t-4}+x_{t-5})&=\epsilon_t \\ \\
+x_t-x_{t-1}-x_{t-4}+x_{t-5}&-0.80x_{t-4}+0.80x_{t-5}+0.80x_{t-8}-0.80x_{t-9} \\
+&-0.25x_{t-8}+0.25x_{t-9}+0.25x_{t-12}-0.25x_{t-13}=\epsilon_t \\ \\
+x_t=x_{t-1}+x_{t-4}-x_{t-5}&+0.80x_{t-4}-0.80x_{t-5}-0.80x_{t-8}+0.80x_{t-9} \\
+&+0.25x_{t-8}-0.25x_{t-9}-0.25x_{t-12}i+0.25x_{t-13}+\epsilon_t \\
 \end{aligned}
 \]
 ```{r result='markup'}
