@@ -35,15 +35,19 @@ ts_plots = function(x) {
 }
 
 ts_resid = function(x){
-  par(mfrow=c(1,2),par=c(2,2,2,2))
+  par(mfrow=c(2,2),par=c(2,2,2,2))
   #ggtsdisplay(x) 
   hist(x)
   qqnorm(x)
+  acf(x)
+  pacf(x)
   d=data.frame(PhillipsPerron=pp.test(x)$p.value,
                       AugmentedDickeyFuller=adf.test(x)$p.value,
                       LjungBox=Box.test(x,type='Ljung-Box')$p.value)
   row.names(d)=c('p-Value')
   xtable(d)
+  
+  ShapiroWilks <- shapiro.test(x)$p.value
 }
 
 forecast_exp_func=function(x){
@@ -127,14 +131,11 @@ xtable(arimatable(m,dfts_log))
 The SMA1 $\beta$ at $-0.5167$ with $SE=0.0975$ suggesting signficance. The $\beta_{sma1}$ does not cross zero.
 
 ```{r fig.height=4}
-ts_resid(m$residuals)
+res <- ts_resid(m$residuals)
+res
 ```
 
-```{r fig.height=3}
-shapiro.test(m$residuals)
-```
-
-The t-plot of the residuals appears to be white noise with heteroskedasticity. We will not further attempt to fit the variance of the residuals with GARCH/ARCH models. The t-plot shows no trend or seasonality. The residuals appear to be a stationary white noise process from the augmented Dickey Fuller and Phillips-Perron Test. However, the Shaprio-Wilks tests indicates that the residsuals of the model are non-normal. Finally, the Ljung-box test almost shows the residuals to be uncorrelated with a p-Value of 0.35 as confirmed by the visual inspection.
+The t-plot of the residuals appears to be white noise with heteroskedasticity. We will not further attempt to fit the variance of the residuals with GARCH/ARCH models. The t-plot shows no trend or seasonality. The residuals appear to be a stationary white noise process from the augmented Dickey Fuller and Phillips-Perron Test. However, the Shaprio-Wilks tests indicates that the residsuals of the model are non-normal, $p<0.05$. Finally, the Ljung-box test almost shows the residuals to be uncorrelated with a p-Value of 0.35 as confirmed by the visual inspection.
 
 We will examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to aid in choosing our final model.
 
@@ -155,25 +156,20 @@ Auto.arima() selected $SARIMA(0,1,0)(2,1,0)_4$. From the manual iterations and a
 ```{r fig.height=4}
 m.010210=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(2,1,0),period=4))
 xtable(arimatable(m.010210,dfts_log))
-ts_resid(m.010210$residuals)
-```
-```{r fig.height=3}
-shapiro.test(m.010210$residuals)
+res.010210 <- ts_resid(m.010210$residuals)
+res.010210
 ```
 
-In the $SARIMA(0,1,0)(2,1,0)_4$, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is $.13$ and the heterskedasticity of the residuals is not evident. The Shaprio-Wilks test on the model residuals gives a significant p-value, indicating a non-normal distribution.
+In the $SARIMA(0,1,0)(2,1,0)_4$, the $\beta$s do not include zero up to the 95% confidence interval and the residual appear to be stationary and white noise. The Ljung-Box p-Value is $.13$ and the heterskedasticity of the residuals is not evident. The Shaprio-Wilks test on the model residuals gives a significant p-value, $p<0.05$, indicating a non-normal distribution.
 
 ```{r fig.height=4}
 m.010012=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(0,1,2),period=4))
 xtable(arimatable(m.010012,dfts_log))
-ts_resid(m.010012$residuals)
+res.010012 <- ts_resid(m.010012$residuals)
+res.010012
 ```
 
-```{r fig.height=3}
-shapiro.test(m.010012$residuals)
-```
-
-In the $SARIMA(0,1,0)(0,1,2)_4$, $\beta$s appear to be statistically siginficant and the residuals do appear to be white noise with stationarity and no autocorrelation. The Ljung-Box p-Value is higher than the $SARIMA(0,1,0)(0,1,1)_4$ model. Note that the heteroskedasticity in residuals no longer appear. Here, the Shaprio-Wilks test also gives $p>0.05$, indicating the distribution is non-normal.
+In the $SARIMA(0,1,0)(0,1,2)_4$, $\beta$s appear to be statistically siginficant and the residuals do appear to be white noise with stationarity and no autocorrelation. The Ljung-Box p-Value is higher than the $SARIMA(0,1,0)(0,1,1)_4$ model. Note that the heteroskedasticity in residuals no longer appear. Here, the Shaprio-Wilks test also gives a significant p-value, $p<0.05$, indicating the distribution is non-normal.
 
 We first note that these series seem comparable as a MA model can be inverted to become an AR model. An $SARIMA(0,1,0)(0,1,2)_4$ is very similar to $SARIMA(0,1,0)(2,1,0)_4$ from invertibility of MA models. 
 
