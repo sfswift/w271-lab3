@@ -76,7 +76,7 @@ run_arima_loop = function(x) {
 }
 ```
 
-# Question 1: Forecasting using a SARIMA model
+## Question 1: Forecasting using a SARIMA model
 
 Note: Custom function ts_plots() [plot time series], ts_resid() [plot residuals], forecast_exp() [exponentiate all values in forecasts objects], arimatable() [summarizes arima table] and run_arima_loop [loop through $p$ and $q$ variables on an arima model] are not included in the R pdf but is in the R-markdown file.
 
@@ -233,7 +233,7 @@ autoplot(forecast_sar,'Model') +autolayer(exp(fitted(m)),series='ARIMA(0,1,0)(2,
 
 The forecast closely follows what we would expect of the trend going forward in 2017.
 
-# Question 2: Learning how to use the xts library
+## Question 2: Learning how to use the xts library
 
 Only Task 5 is left for brevity.
 
