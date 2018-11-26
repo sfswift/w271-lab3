@@ -80,7 +80,7 @@ run_arima_loop = function(x) {
 
 Note: Custom function ts_plots() [plot time series], ts_resid() [plot residuals], forecast_exp() [exponentiate all values in forecasts objects], arimatable() [summarizes arima table] and run_arima_loop [loop through $p$ and $q$ variables on an arima model] are not included in the R pdf but is in the R-markdown file.
 
-In the following report, we analyze and model quarterly data of E-Commerce Retail Sales as the Percent of Total Sales. Our goal is to use the data, ranging from Q4 1999 to Q4 2016, to forecast predictions for each quarter in 2017. First we explore the data and determine what models to further pursue. We selected two models to test in depth, including diagnostic tests and with in- and out-of-model sampling. We use our final model to make a 2017 prediction.
+In the following report, we analyze and model quarterly data of E-Commerce Retail Sales as the Percent of Total Sales. Our goal is to use the data, ranging from Q4 1999 to Q4 2016, to forecast predictions for each quarter in 2017. First, we explore the data and determine what models to further pursue. We selected two models to test in depth, including diagnostic tests and with in- and out-of-model sampling. We use our final model to make a 2017 prediction.
 
 We begin by examining a time series plot, a histogram of the time series and the ACF and PACF plots.
 
@@ -118,6 +118,7 @@ The detrended series shows a strong quarterly seasonality. The time series will 
 df_ds=diff(diff(dfts_log,lag=1),lag=4)
 ggplot(data.frame(cycle=factor(cycle(df_ds)),data=as.numeric(df_ds)),aes(x=cycle,y=data,group=cycle,fill=cycle))+geom_boxplot() + ggtitle('Quarterly Detrended & Deseasonalized Time Series Plot')
 ```
+
 The plot of the detrended and deseasonalized data shows the quarterly mean and variance is now similar across the quarters, indicating a deseasonalized time series.
 
 Augmented Dickey-Fuller and Phillips-Perron tests are performed on deseasonalized, detrended time series (the residuals). Both tests reject the non-stationary hypothesis. With a stationary time series, we can use an ARMA model to model the detrended, deseasonalized time series. 
@@ -142,7 +143,7 @@ m = arima(dfts_log,order=c(0,1,0),seasonal=list(order=c(0,1,1),period=4))
 xtable(arimatable(m,dfts_log))
 ```
 
-The SMA1 $\beta$ at $-0.5167$ with $SE=0.0975$ suggest stationarity at the 95% confidence interval as it does not cross 1. It also does not cross 0 suggesting significance at lag 1.
+The SMA1 $\beta$ at $-0.5167$ with $SE=0.0975$ suggest stationarity at the 95% confidence interval as it does not cross $1$. It also does not cross $0$ suggesting significance at $lag 1$.
 
 ```{r fig.height=4}
 res <- ts_resid(m$residuals)
@@ -157,7 +158,9 @@ We will examine other $SARIMA(p,1,q)(P,1,Q)_4$ up to $p=q=P=Q=2$ to aid in choos
 results=run_arima_loop(dfts_log)
 xtable(head(results[order(results$AIC,results$BIC),],5))
 ```
+
 Auto.arima() selected $SARIMA(0,1,0)(2,1,0)_4$. 
+
 ```{r}
 xtable(arimatable(auto.arima(dfts_log),dfts_log))
 ```
@@ -172,7 +175,6 @@ xtable(arimatable(m.010210,dfts_log))
 ts_resid(m.010210$residuals)
 ```
 
-
 In the $SARIMA(0,1,0)(0,1,2)_4$ below, $\beta$s are statistically significant and the residuals do appear to be white noise with stationarity and no autocorrelation. The Ljung-Box p-Value is higher than the $SARIMA(0,1,0)(0,1,1)_4$ model. Note that the heteroskedasticity in residuals no longer appear. Here, the Shaprio-Wilks test also gives a significant p-value, $p<0.05$, indicating the distribution is non-normal, but once again, Central Limit Theorem is invoked.
 
 ```{r fig.height=4}
@@ -180,7 +182,6 @@ m.010012=arima(dfts_log,order=c(0,1,0),seasonal = list(order=c(0,1,2),period=4))
 xtable(arimatable(m.010012,dfts_log))
 ts_resid(m.010012$residuals)
 ```
-
 
 We first note that these model are very similar. We note the roots of the $SARIMA(0,1,0)(0,1,2)_4$ are `r round(Mod(polyroot(c(1,-0.77,0.4))),2)` and the roots of $SARIMA(0,1,0)(2,1,0)_4$ are `r Mod(polyroot(c(1,0.8,0.25)))`. The $SARIMA(0,1,0)(0,1,2)_4$ is invertible to $SARIMA(0,1,0)(2,1,0)_4$. Both models are quite similar. 
 
@@ -206,7 +207,7 @@ Every accuracy measure tested showed a lower error with $SARIMA(0,1,0)(2,1,0)_4$
 \[
 \begin{aligned}
 &SARIMA(0,1,0)(2,1,0)_4 \\
-(1-0.80B-0.25B^2)_4(1-B)_4(1-B)x_t&=\epsilon_t \\ 
+(1-0.80B-0.25B^2)_4(1-B^4)(1-B)x_t&=\epsilon_t \\ 
 (1-0.80B-0.25B^2)_4(x_t-x_{t-1}-x_{t-4}+x_{t-5})&=\epsilon_t \\ \\
 x_t-x_{t-1}-x_{t-4}+x_{t-5}&-0.80x_{t-4}+0.80x_{t-5}+0.80x_{t-8}-0.80x_{t-9} \\
 &-0.25x_{t-8}+0.25x_{t-9}+0.25x_{t-12}-0.25x_{t-13}=\epsilon_t \\ \\
@@ -214,12 +215,15 @@ x_t=x_{t-1}+x_{t-4}-x_{t-5}&+0.80x_{t-4}-0.80x_{t-5}-0.80x_{t-8}+0.80x_{t-9} \\
 &+0.25x_{t-8}-0.25x_{t-9}-0.25x_{t-12}i+0.25x_{t-13}+\epsilon_t \\
 \end{aligned}
 \]
+
 ```{r result='markup'}
 df_full_log=ts(log(df$ECOMPCTNSA),start=c(1999,4),freq=4)
 m=m.010210
 xtable(arimatable(m,df_full_log))
 ```
+
 The forecast for 2017 using $SARIMA(0,1,0)(2,1,0)_4$ is 
+
 ```{r}
 m=Arima(df_full_log,model=m)  # insert the new series into the m.010210 arima model
 forecast_sar=forecast_exp_func(forecast(m,h = 4))
